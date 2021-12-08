@@ -1,8 +1,9 @@
 package com.example.file.controller;
 
 import com.example.file.model.Response;
-import com.example.file.service.AssetType;
-import com.example.file.service.StorageService;
+import com.example.file.service.FileService;
+import com.example.file.storage.AssetType;
+import com.example.file.storage.StorageService;
 import java.io.IOException;
 import java.io.InputStream;
 import javax.servlet.http.HttpServletRequest;
@@ -19,12 +20,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class FileUploadController
 {
 
-    private final StorageService storageService;
+
+    private final FileService fileService;
 
 
-    public FileUploadController(StorageService storageService)
+    public FileUploadController(FileService fileService)
     {
-        this.storageService = storageService;
+        this.fileService = fileService;
     }
 
 
@@ -51,7 +53,8 @@ public class FileUploadController
                     // Process the input stream
                     //OutputStream out = new FileOutputStream(filename);
                    // IOUtils.copy(stream, out);
-                    storageService.upload(stream, AssetType.TEST, item.getContentType(), filename );
+                    String contentType = item.getContentType();
+                    fileService.create(stream, contentType, filename);
                     stream.close();
                    // out.close();
                 }

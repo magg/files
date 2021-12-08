@@ -1,4 +1,4 @@
-package com.example.file.service;
+package com.example.file.storage;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

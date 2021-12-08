@@ -1,6 +1,6 @@
 package com.example.file.controller;
 
-import com.example.file.service.StorageService;
+import com.example.file.storage.StorageService;
 import java.util.UUID;
 import org.springframework.core.io.Resource;
 import org.springframework.web.bind.annotation.PathVariable;

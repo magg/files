@@ -1,4 +1,4 @@
-package com.example.file.service;
+package com.example.file.storage;
 
 import java.io.InputStream;
 

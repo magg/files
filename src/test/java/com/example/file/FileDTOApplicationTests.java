@@ -4,7 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class FileApplicationTests {
+class FileDTOApplicationTests
+{
 
 	@Test
 	void contextLoads() {
