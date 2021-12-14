@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "io.grpc.examples.filedownload";
+option java_outer_classname = "FileDownloadService";
+option objc_class_prefix = "FDLS";
+
+package filedownload;
+
+message Chunk {
+  bytes data = 1;
+}
+
+// The file download service definition.
+service FileDownload {
+  // Downlod a file
+  rpc Download(FileDownloadRequest) returns (stream Chunk) {}
+}
+
+// The request message containing the user's name.
+message FileDownloadRequest {
+  string url = 1;
+}
+
+
+message MetaData {
+  string name = 1;
+  string type = 2;
+}
+
+message FileUploadRequest {
+  oneof request {
+    MetaData metadata = 1;
+    Chunk file = 2;
+  }
+}
+
+service FileUploadService {
+  rpc Upload(stream FileUploadRequest) returns (UploadStatus) {}
+}
+
+enum UploadStatusCode {
+  Unknown = 0;
+  Ok = 1;
+  Failed = 2;
+  Pending = 3;
+  In_Progress = 4;
+}
+
+message UploadStatus {
+  string Message = 1;
+  UploadStatusCode Code = 2;
+}
