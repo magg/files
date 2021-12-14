@@ -1,3 +1,10 @@
+.DS_Store
+.mvn
+
+files/.DS_STORE
+files/.mvn
+
+
 HELP.md
 target/
 !.mvn/wrapper/maven-wrapper.jar
