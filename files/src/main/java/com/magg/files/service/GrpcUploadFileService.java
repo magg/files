@@ -15,9 +15,9 @@ import java.nio.file.StandardOpenOption;
 import net.devh.boot.grpc.server.service.GrpcService;
 
 @GrpcService
-public class GrpcFileService extends FileUploadServiceGrpc.FileUploadServiceImplBase
+public class GrpcUploadFileService extends FileUploadServiceGrpc.FileUploadServiceImplBase
 {
-    private static final Path SERVER_BASE_PATH = Paths.get("src/test/resources/output");
+    private static final Path SERVER_BASE_PATH = Paths.get("/tmp/output");
 
 
     @Override
@@ -27,9 +27,12 @@ public class GrpcFileService extends FileUploadServiceGrpc.FileUploadServiceImpl
             OutputStream writer;
             UploadStatusCode status = UploadStatusCode.In_Progress;
             String message = "";
+            int part=0;
 
             @Override
             public void onNext(FileUploadRequest fileUploadRequest) {
+                System.out.println(part);
+
                 try{
                     if(fileUploadRequest.hasMetadata()){
                         writer = getFilePath(fileUploadRequest);
@@ -39,17 +42,21 @@ public class GrpcFileService extends FileUploadServiceGrpc.FileUploadServiceImpl
                 } catch (IOException e){
                     this.onError(e);
                 }
+
+
+                part++;
             }
 
             @Override
             public void onError(Throwable throwable) {
                 status = UploadStatusCode.Failed;
+                System.out.println(throwable.getMessage());
                 this.onCompleted();
             }
 
             @Override
             public void onCompleted() {
-                closeFile(writer);
+                //closeFile(writer);
                 status = UploadStatusCode.In_Progress.equals(status) ? UploadStatusCode.Ok : status;
                 if (status.equals(UploadStatusCode.Failed)) {
                     message = "failed to send";
@@ -70,7 +77,9 @@ public class GrpcFileService extends FileUploadServiceGrpc.FileUploadServiceImpl
     }
 
     private OutputStream getFilePath(FileUploadRequest request) throws IOException {
-        var fileName = request.getMetadata().getName() + "." + request.getMetadata().getType();
+
+        Files.createDirectories(SERVER_BASE_PATH);  // No need for your null check, so I removed it; based on `fileName`, it will always have a parent
+        var fileName = request.getMetadata().getName() ;
         return Files.newOutputStream(SERVER_BASE_PATH.resolve(fileName), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
 

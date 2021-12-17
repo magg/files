@@ -166,7 +166,7 @@
         <artifactId>spring-boot-maven-plugin</artifactId>
         <configuration>
           <executable>true</executable>
-          <mainClass>com.magg.files.FilesApplication</mainClass>
+          <mainClass>com.magg.files.FileApplication</mainClass>
         </configuration>
       </plugin>
     </plugins>

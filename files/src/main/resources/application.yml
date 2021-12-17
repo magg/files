@@ -18,4 +18,8 @@ aws:
 
 mongock:
   change-logs-scan-package:
-    - com.example.file
+    - com.magg.files
+
+grpc:
+  server:
+    maxInboundMessageSize: 15MB
