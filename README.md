@@ -128,9 +128,14 @@ The Backend server also offers a REST API, it has two endpoints
 
 
 TODOs
-* Document all the code.
+* Document rest of the code.
 * Add automated tests
 * Maybe replace AWS S3 with a system like MinIO
+* Extend the encryption/decryption algorithm or ciphers used as of now. I think I made the module extensible to achieve this.
+* Implement the REST API on the client side.
+* Add security and users to the backend server and client module.
+* Find a better solution right now to upload the file to the storage provider. Right now it's being uploaded to the server's disk and then uploaded to the storage provider. I think Amazon at least can give you temporary URL which can be used to upload the files directly from the client.
+
 
 
 
