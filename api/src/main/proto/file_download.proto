@@ -11,15 +11,23 @@ message Chunk {
   bytes data = 1;
 }
 
+
+message FileDownloadResponse {
+  oneof request {
+    MetaData metadata = 1;
+    Chunk file = 2;
+  }
+}
+
 // The file download service definition.
 service FileDownload {
   // Downlod a file
-  rpc Download(FileDownloadRequest) returns (stream Chunk) {}
+  rpc Download(FileDownloadRequest) returns (stream FileDownloadResponse) {}
 }
 
 // The request message containing the user's name.
 message FileDownloadRequest {
-  string url = 1;
+  string id = 1;
 }
 
 
@@ -50,4 +58,5 @@ enum UploadStatusCode {
 message UploadStatus {
   string Message = 1;
   UploadStatusCode Code = 2;
+  string fileId = 3;
 }

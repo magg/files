@@ -1,2 +1,4 @@
 server: localhost
 port: 9090
+
+downloadPath: /Users/magg/Downloads/

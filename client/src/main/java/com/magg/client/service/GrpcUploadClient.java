@@ -18,7 +18,9 @@ import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class GrpcUploadClient
 {
 
@@ -33,12 +35,12 @@ public class GrpcUploadClient
     public GrpcUploadClient(String hostname, int port){
         this(ManagedChannelBuilder.forAddress(hostname, port)
             .usePlaintext()
-            .keepAliveTime(150, TimeUnit.SECONDS)
+            .keepAliveTime(15, TimeUnit.MINUTES)
             .build());
     }
 
     public void shutdown() throws InterruptedException {
-        channel.shutdown().awaitTermination(20, TimeUnit.SECONDS);
+        channel.shutdown().awaitTermination(15, TimeUnit.MINUTES);
     }
 
     /** Construct client for accessing FileDownload server using the existing channel. */
@@ -52,16 +54,35 @@ public class GrpcUploadClient
     public void upload(String filePath) {
 
         // request observer
-        StreamObserver<UploadStatus> responseObserver = new FileUploadObserver();
+        StreamObserver<UploadStatus> responseObserver = new StreamObserver<UploadStatus>()
+        {
 
+            @Override
+            public void onNext(UploadStatus fileUploadResponse) {
+                System.out.println("File upload status :: " + fileUploadResponse.getCode());
+                System.out.println("File message :: " + fileUploadResponse.getMessage());
+                System.out.println("File Id: " + fileUploadResponse.getFileId());
+                log.info("test, {}", fileUploadResponse);
+            }
 
+            @Override
+            public void onError(Throwable throwable) {
+                System.out.println(
+                    throwable.getMessage()
+                );
+                finishLatch.countDown();
+            }
+
+            @Override
+            public void onCompleted() {
+                System.out.println("complete");finishLatch.countDown();
+            }
+        };
         StreamObserver<FileUploadRequest> requestObserver = this.fileServiceStub.upload(responseObserver);
 
-        // input file for testing
         Path path = Paths.get(filePath);
         try
         {
-
             String mimeType = Files.probeContentType(path);
             // build metadata
             FileUploadRequest metadata = FileUploadRequest.newBuilder()
@@ -73,20 +94,7 @@ public class GrpcUploadClient
 
             int PART_SIZE = 10*1024*1024;
             // upload file as chunk
-            //InputStream inputStream = Files.newInputStream(path);
             byte[] bytes = new byte[PART_SIZE];
-
-            /*
-            int size;
-            while ((size = inputStream.read(bytes)) > 0)
-            {
-                FileUploadRequest uploadRequest = FileUploadRequest.newBuilder()
-                    .setFile(Chunk.newBuilder().setData(ByteString.copyFrom(bytes, 0, size)).build())
-                    .build();
-                streamObserver.onNext(uploadRequest);
-            }
-
-             */
 
             int bytesRead;
             byte[] toWrite;
@@ -101,18 +109,30 @@ public class GrpcUploadClient
                         .setFile(Chunk.newBuilder().setData(ByteString.copyFrom(toWrite)).build())
                         .build();
                     requestObserver.onNext(uploadRequest);
+                    if (finishLatch.getCount() == 0) {
+                        return;
+                    }
                     partNumber++;
                 }
 
-
-
             // close the stream
-                inputStream.close();
+            inputStream.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error(e.getMessage());
         } finally
         {
             requestObserver.onCompleted();
+
+            try
+            {
+                if (!finishLatch.await(1, TimeUnit.MINUTES)) {
+                    log.warn("clientSideStreamingGetStatisticsOfStocks can not finish within 1 minutes");
+                }
+            }
+            catch (InterruptedException e)
+            {
+                log.error(e.getMessage());
+            }
         }
 
     }

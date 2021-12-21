@@ -10,7 +10,9 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import javax.crypto.SecretKey;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class KeyUtils
 {
     public static void generateKey(String name) {
@@ -35,7 +37,8 @@ public class KeyUtils
         }
         catch (GeneralSecurityException | IOException e)
         {
-            e.printStackTrace();
+            log.error(e.getMessage());
+            System.exit(-1);
         }
     }
 

@@ -97,4 +97,40 @@ public abstract class BaseEncryption implements Encryption {
             throw new IllegalArgumentException(message);
         }
     }
+
+
+    /**
+     *  Encrypts a file
+     * @param params Parameters for encryption or decryption
+     * @param mode   Decryption or encryption mode
+     * @param fileName the file name
+     * @throws GeneralSecurityException if decryption or encryption failed
+     */
+    protected abstract String encryptFile(EncryptionParams params, int mode, String fileName) throws GeneralSecurityException;
+
+
+    /**
+     *  Encrypts a file
+     * @param params Parameters for encryption or decryption
+     * @param fileName the file name
+     * @throws GeneralSecurityException if decryption or encryption failed
+     */
+    public String encodeFile(EncryptionParams params, String fileName) throws GeneralSecurityException {
+        validateEncryptionParams(params);
+        return encryptFile(params, Cipher.ENCRYPT_MODE, fileName);
+    }
+
+    protected abstract void decrypt(EncryptionParams params, String fileName, int mode);
+
+    /**
+     *  Encrypts a file
+     * @param params Parameters for encryption or decryption
+     * @param fileName the file name
+     * @throws GeneralSecurityException if decryption or encryption failed
+     */
+    public void decodeFile(EncryptionParams params, String fileName) throws GeneralSecurityException {
+        validateEncryptionParams(params);
+        decrypt(params, fileName, Cipher.DECRYPT_MODE);
+    }
+
 }

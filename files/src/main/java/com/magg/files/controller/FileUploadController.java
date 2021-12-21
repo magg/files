@@ -54,7 +54,7 @@ public class FileUploadController
                     //OutputStream out = new FileOutputStream(filename);
                    // IOUtils.copy(stream, out);
                     String contentType = item.getContentType();
-                    fileDTO = fileService.create(stream, contentType, filename);
+                    fileDTO = fileService.create(stream, contentType, filename, null);
                     stream.close();
                    // out.close();
                 }

@@ -7,5 +7,6 @@ public final class Configuration
 {
     private String server;
     private int port;
+    private String downloadPath;
 
 }

@@ -2,6 +2,7 @@ package com.magg.storage;
 
 import com.magg.api.dto.FileDTO;
 import com.magg.api.exception.StorageException;
+import io.github.resilience4j.retry.annotation.Retry;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -27,6 +28,7 @@ import javax.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.core.ResponseInputStream;
@@ -200,12 +202,14 @@ public class AwsStorageService implements StorageService
        } catch (SdkClientException | IOException e) {
             // Amazon S3 couldn't be contacted for a response, or the client
             // couldn't parse the response from Amazon S3.
-            e.printStackTrace();
+            log.error(e.getMessage());
         }
     }
+
+    @Retry(name = "throwingException")
     @Override
     public Long retrieveContentLength(String name) {
-
+        log.info("try");
         try {
 
             return s3Client.headObject(HeadObjectRequest.builder()
@@ -216,26 +220,18 @@ public class AwsStorageService implements StorageService
         } catch (SdkClientException e) {
             // Amazon S3 couldn't be contacted for a response, or the client
             // couldn't parse the response from Amazon S3.
-            e.printStackTrace();
+            log.error(e.getMessage());
         }
 
         return null;
     }
 
 
+    @Async
     @Override
-    public void upload2(InputStream in, AssetType assetType, String contentType, String name)
+    public void upload(InputStream in, AssetType assetType, String name, FileDTO fileDTO)
     {
-
-        multiPartUpload(AssetType.TEST.getPrefix()+name, in, contentType);
-
-    }
-
-
-    @Override
-    public void upload3(InputStream in, AssetType assetType, String contentType, String name, String id)
-    {
-        multiPartUpload3(AssetType.TEST.getPrefix()+name, in, contentType, id);
+        multiPartUpload3(AssetType.TEST.getPrefix()+ name, in, fileDTO.getContentType(), fileDTO.getExternalId());
 
     }
 
@@ -329,106 +325,6 @@ public class AwsStorageService implements StorageService
         futuresPartETags.add(partETagFuture);
     }
 
-
-
-    public void multiPartUpload(String key, InputStream inputStream, String contentType) {
-        // First create a multipart upload and get the upload id
-        CreateMultipartUploadRequest createMultipartUploadRequest = CreateMultipartUploadRequest.builder()
-            .bucket(bucketName)
-            .key(key)
-            .contentType(contentType)
-            .build();
-
-        CreateMultipartUploadResponse response = s3Client.createMultipartUpload(createMultipartUploadRequest);
-        String uploadId = response.uploadId();
-        System.out.println(uploadId);
-
-        List<CompletableFuture<CompletedPart>> futures = new ArrayList<>();
-
-        final int UPLOAD_PART_SIZE = 10 * (int) SizeConstant.MB; // Part Size should not be less than 5 MB while using MultipartUpload
-
-        try {
-
-            int bytesRead, bytesAdded = 0;
-            byte[] data = new byte[UPLOAD_PART_SIZE];
-            //ByteArrayOutputStream bufferOutputStream = new ByteArrayOutputStream();
-            int part = 1;
-            while ((bytesRead = inputStream.read(data, 0, data.length)) != -1) {
-
-
-                //bufferOutputStream.write(data, 0, bytesRead);
-                if (bytesAdded < UPLOAD_PART_SIZE) {
-                    // continue writing to same output stream unless it's size gets more than UPLOAD_PART_SIZE
-                    bytesAdded += bytesRead;
-                    continue;
-                }
-
-                log.info(String.format("Submitting uploadPartId: %s", printMb(bytesAdded)));
-
-                //multipartUpload.uploadPartAsync(new ByteArrayInputStream(bufferOutputStream.toByteArray()));
-
-                int finalPart = part;
-                int finalBytesAdded = bytesAdded;
-                CompletableFuture<CompletedPart> partCompletableFuture = CompletableFuture.supplyAsync(() ->
-                        uploadRequest(
-                            new ByteArrayInputStream(data, 0, finalBytesAdded),
-                            false,
-                            key,
-                            uploadId,
-                            finalPart
-                        )
-                    );
-                futures.add(partCompletableFuture);
-
-                part++;
-                //bufferOutputStream.reset(); // flush the bufferOutputStream
-                bytesAdded = 0; // reset the bytes added to 0
-            }
-
-            // upload remaining part of output stream as final part
-            // bufferOutputStream size can be less than 5 MB as it is the last part of upload
-            //multipartUpload.uploadFinalPartAsync(new ByteArrayInputStream(bufferOutputStream.toByteArray()));
-
-            int finalPart = part;
-            int finalBytesAdded1 = bytesAdded;
-            CompletableFuture<CompletedPart> partCompletableFuture = CompletableFuture.supplyAsync(() ->
-                uploadRequest(
-                    new ByteArrayInputStream(data, 0, finalBytesAdded1),
-                    false,
-                    key,
-                    uploadId,
-                    finalPart)
-            );
-            futures.add(partCompletableFuture);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        List<CompletedPart> allParts = futures.stream()
-            .map(CompletableFuture::join)
-            .collect(Collectors.toList());
-
-        allParts.sort(Comparator.comparing(CompletedPart::partNumber));
-
-        // Finally call completeMultipartUpload operation to tell S3 to merge all uploaded
-        // parts and finish the multipart operation.
-        CompletedMultipartUpload completedMultipartUpload = CompletedMultipartUpload.builder()
-            .parts(allParts)
-            .build();
-
-        CompleteMultipartUploadRequest completeMultipartUploadRequest =
-            CompleteMultipartUploadRequest.builder()
-                .bucket(bucketName)
-                .key(key)
-                .uploadId(uploadId)
-                .multipartUpload(completedMultipartUpload)
-                .build();
-
-        s3Client.completeMultipartUpload(completeMultipartUploadRequest);
-
-    }
-
     private CompletedPart uploadRequest(ByteArrayInputStream inputStream,
         boolean isFinalPart,
         String filename,
@@ -507,106 +403,6 @@ public class AwsStorageService implements StorageService
         return cnt_size;
     }
 
-    public void multiPartUpload2(String key, InputStream inputStream, String contentType) {
-        // First create a multipart upload and get the upload id
-        CreateMultipartUploadRequest createMultipartUploadRequest = CreateMultipartUploadRequest.builder()
-            .bucket(bucketName)
-            .key(key)
-            .contentType(contentType)
-            .build();
-
-        CreateMultipartUploadResponse response = s3Client.createMultipartUpload(createMultipartUploadRequest);
-        String uploadId = response.uploadId();
-        System.out.println(uploadId);
-
-        List<CompletableFuture<CompletedPart>> futures = new ArrayList<>();
-
-        final int UPLOAD_PART_SIZE = 10 * (int) SizeConstant.MB; // Part Size should not be less than 5 MB while using MultipartUpload
-
-        try {
-
-            int bytesRead, bytesAdded = 0;
-            byte[] data = new byte[UPLOAD_PART_SIZE];
-            ByteArrayOutputStream bufferOutputStream = new ByteArrayOutputStream();
-            int part = 1;
-            while ((bytesRead = inputStream.read(data, 0, data.length)) != -1) {
-
-                bufferOutputStream.write(data, 0, bytesRead);
-
-                if (bytesAdded < UPLOAD_PART_SIZE) {
-                    // continue writing to same output stream unless it's size gets more than UPLOAD_PART_SIZE
-                    bytesAdded += bytesRead;
-                    continue;
-                }
-
-                log.info(String.format("Submitting uploadPartId: %s", printMb(bytesAdded)));
-
-                //multipartUpload.uploadPartAsync(new ByteArrayInputStream(bufferOutputStream.toByteArray()));
-
-                int finalPart = part;
-                int finalBytesAdded = bytesAdded;
-                CompletableFuture<CompletedPart> partCompletableFuture = CompletableFuture.supplyAsync(() ->
-                    uploadRequest(
-                        new ByteArrayInputStream(data, 0, finalBytesAdded),
-                        false,
-                        key,
-                        uploadId,
-                        finalPart
-                    )
-                );
-                futures.add(partCompletableFuture);
-
-                part++;
-                bufferOutputStream.reset(); // flush the bufferOutputStream
-                bytesAdded = 0; // reset the bytes added to 0
-            }
-
-            // upload remaining part of output stream as final part
-            // bufferOutputStream size can be less than 5 MB as it is the last part of upload
-            //multipartUpload.uploadFinalPartAsync(new ByteArrayInputStream(bufferOutputStream.toByteArray()));
-
-            int finalPart = part;
-            int finalBytesAdded = bytesAdded;
-            CompletableFuture<CompletedPart> partCompletableFuture = CompletableFuture.supplyAsync(() ->
-                uploadRequest(
-                    new ByteArrayInputStream(data, 0, finalBytesAdded),
-                    false,
-                    key,
-                    uploadId,
-                    finalPart
-                )
-            );
-            futures.add(partCompletableFuture);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        List<CompletedPart> allParts = futures.stream()
-            .map(CompletableFuture::join)
-            .collect(Collectors.toList());
-
-        allParts.sort(Comparator.comparing(CompletedPart::partNumber));
-
-        // Finally call completeMultipartUpload operation to tell S3 to merge all uploaded
-        // parts and finish the multipart operation.
-        CompletedMultipartUpload completedMultipartUpload = CompletedMultipartUpload.builder()
-            .parts(allParts)
-            .build();
-
-        CompleteMultipartUploadRequest completeMultipartUploadRequest =
-            CompleteMultipartUploadRequest.builder()
-                .bucket(bucketName)
-                .key(key)
-                .uploadId(uploadId)
-                .multipartUpload(completedMultipartUpload)
-                .build();
-
-        s3Client.completeMultipartUpload(completeMultipartUploadRequest);
-
-    }
-
-
     public void multiPartUpload3(String key, InputStream inputStream, String contentType, String id)
     {
         // First create a multipart upload and get the upload id
@@ -634,15 +430,15 @@ public class AwsStorageService implements StorageService
 
             int partNumber = 1;
             int firstByte = 0;
-            Boolean isFirstChunck = true;
+            boolean isFirstChunk = true;
 
-            InputStream firstChunck = new ByteArrayInputStream(data);
-            PushbackInputStream chunckableInputStream = new PushbackInputStream(inputStream, 1);
+            InputStream firstChunk = new ByteArrayInputStream(data);
+            PushbackInputStream chunkableInputStream = new PushbackInputStream(inputStream, 1);
 
-            while (-1 != (firstByte = chunckableInputStream.read()))
+            while (-1 != (firstByte = chunkableInputStream.read()))
             {
                 long partSize = 0;
-                chunckableInputStream.unread(firstByte);
+                chunkableInputStream.unread(firstByte);
                 File tempFile = File.createTempFile(id.concat("-part").concat(String.valueOf(partNumber)), "tmp");
                 tempFile.deleteOnExit();
                 OutputStream os = null;
@@ -650,14 +446,14 @@ public class AwsStorageService implements StorageService
                 {
                     os = new BufferedOutputStream(new FileOutputStream(tempFile.getAbsolutePath()));
 
-                    if (isFirstChunck)
+                    if (isFirstChunk)
                     {
-                        partSize = IOUtils.copyLarge(firstChunck, os, 0, (UPLOAD_PART_SIZE));
-                        isFirstChunck = false;
+                        partSize = IOUtils.copyLarge(firstChunk, os, 0, (UPLOAD_PART_SIZE));
+                        isFirstChunk = false;
                     }
                     else
                     {
-                        partSize = IOUtils.copyLarge(chunckableInputStream, os, 0, (UPLOAD_PART_SIZE));
+                        partSize = IOUtils.copyLarge(chunkableInputStream, os, 0, (UPLOAD_PART_SIZE));
                     }
                     written += partSize;
 
@@ -682,9 +478,9 @@ public class AwsStorageService implements StorageService
 
                 FileInputStream chunk = new FileInputStream(tempFile);
 
-                Boolean isLastPart = -1 == (firstByte = chunckableInputStream.read());
+                boolean isLastPart = -1 == (firstByte = chunkableInputStream.read());
                 if(!isLastPart)
-                    chunckableInputStream.unread(firstByte);
+                    chunkableInputStream.unread(firstByte);
 
 
                 int finalPart = partNumber;;
@@ -704,10 +500,7 @@ public class AwsStorageService implements StorageService
             }
 
             List<CompletedPart> allParts = futures.stream()
-                .map(CompletableFuture::join)
-                .collect(Collectors.toList());
-
-            allParts.sort(Comparator.comparing(CompletedPart::partNumber));
+                .map(CompletableFuture::join).sorted(Comparator.comparing(CompletedPart::partNumber)).collect(Collectors.toList());
 
             // Finally call completeMultipartUpload operation to tell S3 to merge all uploaded
             // parts and finish the multipart operation.

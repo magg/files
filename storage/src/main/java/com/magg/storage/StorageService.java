@@ -43,11 +43,7 @@ public interface StorageService {
         throw new FileNotFoundException();
     }
 
-    void upload(InputStream in, AssetType assetType, String contentType, String name);
-
     Long retrieveContentLength(String name);
 
-    void upload2(InputStream in, AssetType assetType, String contentType, String name);
-
-    void upload3(InputStream in, AssetType assetType, String contentType, String name, String id);
+    void upload(InputStream in, AssetType assetType, String name, FileDTO fileDTO);
 }

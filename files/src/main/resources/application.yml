@@ -23,3 +23,13 @@ mongock:
 grpc:
   server:
     maxInboundMessageSize: 15MB
+
+
+resilience4j:
+  retry:
+    instances:
+      throwingException:
+        maxRetryAttempts: 10
+        waitDuration: 60s
+        retryExceptions:
+          - software.amazon.awssdk.services.s3.model.NoSuchKeyException
